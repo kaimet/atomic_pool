@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Atomic Pool</title>
+</head>
+
+<body style="background-image: url('img/bg.jpg')">
+
+<div id="container" style="display: flex; justify-content: center;">
+<canvas id="gameCanvas" width="550" height="550" style="border:2px solid #000000;"></canvas>
+</div>
+
+<div id="scoreContainer" style="display: flex; justify-content: center; font-size = '36px'"></div>
+
+
+
+<script>  // ===================================================
+
+
+const playerRad = 10;
+const playerForce = 0.05;
+const traction = 0.95; // on stage 1
+const traction3 = 0.995; // on stage 3
+const slingForse = 0.001;
+
+const nBalls = 2;
+const ballRad = 80;
+
+
+// =============================================================
+
+var Score = 0;
+var gameStage = 1;
+var fast = false;
+var pause = false;
+var gameOver = false;
+var showFPS = false;
+var edge = 0;
+
+
+var scoreElement = document.createElement('div');
+scoreContainer.appendChild(scoreElement);
+scoreElement.style.fontSize = '36px';
+
+var fpsOut = document.createElement('div');
+document.body.appendChild(fpsOut);
+fpsOut.style.fontSize = '24px';
+
+var debugOut = document.createElement('div');
+document.body.appendChild(debugOut);
+debugOut.style.fontSize = '28px';
+
+var canvas = document.getElementById("gameCanvas");
+var ctx = canvas.getContext("2d");
+ctx.imageSmoothingEnabled = true;
+//ctx.imageSmoothingQuality = 'high';
+
+
+var backgroundImage = new Image();
+backgroundImage.src = "img/background.jpg";
+var edgeImage = new Image();
+edgeImage.src = "img/edge.jpg";
+
+var ballImage = new Image();
+ballImage.src = "img/ball.png";
+var speckMaskImage = new Image();
+speckMaskImage.src = "img/speck-mask.png";
+var playerImage = new Image();
+playerImage.src = "img/player.png";
+var trailImage = playerImage;
+
+
+var bounceSound = new Sound('sounds/bounceball.mp3');
+var bounceWallSound = bounceSound;
+
+// =============================================
+
+
+var keys = {};
+document.onkeydown = document.onkeyup = function(e) {
+	keys[e.keyCode] = e.type == 'keydown';
+	//db(e.keyCode);
+	
+	// Space
+	if (e.keyCode == 32 && e.type == 'keydown' && gameStage==1) {
+		gameStage = 2;
+		player.vx = player.vy = 0;
+	}
+	
+	// Pause on P or Escape
+	if (e.type == 'keydown' && (e.keyCode == 80 || e.keyCode == 27)) {
+		pause = pause ? false : true; 
+	}
+	
+	// Fast on Ctrl 
+	if (e.keyCode == 17) {
+		fast = e.type == 'keydown';
+	}
+	
+	// fps on `
+	if (e.keyCode == 192 && e.type == 'keydown') {
+		showFPS = !showFPS;
+		if (!showFPS) fpsOut.innerHTML = '';
+	}
+};
+
+
+function db(v) {
+	debugOut.innerHTML = v;
+}
+
+
+function Sound(filename) {
+		this.sounds = [];
+		var nSounds = 3;
+		this.currentSound = 0;
+		for (var i = 0; i < nSounds; i++) {
+				this.sounds.push(new Audio(filename));
+		}
+
+		this.play = function() {
+				this.sounds[this.currentSound].play();
+				this.currentSound = (this.currentSound + 1) % nSounds;
+		}
+}
+
+
+var frameTime = 0, lastLoop = new Date(), thisLoop;
+function countFPS() {
+	const FPSfilterStrength = 20;
+	var thisFrameTime = (thisLoop = new Date()) - lastLoop;
+	frameTime += (thisFrameTime - frameTime) / FPSfilterStrength;
+	lastLoop = thisLoop;
+}
+
+setInterval(function(){
+	if (showFPS) {
+		fpsOut.innerHTML = (1000/frameTime).toFixed(1) + " fps";
+	}
+}, 1000);
+
+
+
+
+
+function Player(x, y) {
+	this.x = x;
+	this.y = y;
+	this.radius = playerRad;
+	this.vx = 0;
+	this.vy = 0;
+	
+	this.sling = {x: x, y: y};
+	
+} 
+var player = new Player(Math.random() * canvas.width, Math.random() * canvas.height);
+
+
+Player.prototype.speed = function() {
+  return Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+}
+
+Player.prototype.slingLength = function() {
+	var dx = this.x - this.sling.x;
+	var dy = this.y - this.sling.y;
+	return Math.sqrt(dx * dx + dy * dy);
+}
+
+
+Player.prototype.update = function() {
+	if (gameStage == 1) {
+		var ds = playerForce * (this.speed() + 0.2);
+		if (keys[37]) {            // left arrow
+				this.vx -= ds;
+		}
+		if (keys[38]) {            // up arrow
+				this.vy -= ds;
+		}
+		if (keys[39]) {            // right arrow
+				this.vx += ds;
+		}
+		if (keys[40] || keys[12]) { // down arrow
+				this.vy += ds;
+		}
+	} else if (gameStage == 2) {
+		this.vx -= (this.x - this.sling.x) * slingForse;
+		this.vy -= (this.y - this.sling.y) * slingForse;
+		
+		if (this.slingLength() < this.radius) {
+			gameStage = 3
+		}
+	}
+	
+	
+	
+	
+	if (gameStage == 1) {
+	this.vx *= traction;
+	this.vy *= traction;
+	} else if (gameStage == 3) {
+		var v = this.speed()
+		if (v < traction3) { 
+			this.vx *= 0.9 + v * 0.1;
+			this.vy *= 0.9 + v * 0.1;
+		} else {
+			this.vx *= traction3;
+			this.vy *= traction3;
+		}
+	}
+	
+	this.x += this.vx;
+	this.y += this.vy;
+	
+	
+	this.bounceWall()
+	
+	
+	
+}// Player.update()
+
+
+Player.prototype.bounceWall = function() {
+	if (this.x - this.radius < edge) {
+			let overlap = edge + this.radius - this.x;
+			this.x += 2 * overlap;
+			this.vx *= -1;
+			bounceWallSound.play();
+	} else if (this.x + this.radius > canvas.width-edge) { 
+			let overlap = this.x + this.radius - canvas.width+edge;
+			this.x -= 2 * overlap;
+			this.vx *= -1;
+			bounceWallSound.play();
+	}
+	if (this.y - this.radius < edge) {
+			let overlap = edge + this.radius - this.y;
+			this.y += 2 * overlap;
+			this.vy *= -1;
+			bounceWallSound.play();
+	} else if (this.y + this.radius > canvas.height-edge) { 
+			let overlap = this.y + this.radius - canvas.height+edge;
+			this.y -= 2 * overlap;
+			this.vy *= -1;
+			bounceWallSound.play();
+	}
+}
+
+
+Player.prototype.draw = function() {
+	
+	if (gameStage < 3) {
+		this.drawSling();
+	}
+	
+	//ctx.drawImage(playerImage, this.x - this.radius, this.y - 	this.radius, this.radius * 2, this.radius * 2);
+	
+	ctx.beginPath();
+	ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+	ctx.fillStyle = "brown";
+	ctx.fill();
+	ctx.strokeStyle = "black";
+	ctx.stroke();
+	
+	
+} // Player.draw()
+
+
+Player.prototype.drawSling = function() {
+	var dx = this.x - this.sling.x;
+	var dy = this.y - this.sling.y;
+	var length = Math.sqrt(dx * dx + dy * dy);
+	const nlinks = 25;
+	var r = this.radius/(Math.sqrt(this.slingLength())+5)*5;
+	for (i=0; i<nlinks; i++) {
+		var x = this.sling.x + i * dx/nlinks;
+		var y = this.sling.y + i * dy/nlinks;
+		ctx.beginPath();
+		ctx.arc(x, y, r, 0, Math.PI * 2);
+		ctx.fillStyle = "#993300";
+		ctx.fill();
+	}
+}
+
+
+
+function update() {
+	
+	player.update();
+	
+}
+
+
+
+function draw() {
+	//drawBackground();
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
+	
+	player.draw();
+	
+	
+}
+
+
+
+// Main Loop
+setInterval(function() {
+	if (gameOver || pause) return;
+	
+	update();
+	
+	if (fast) { // 3 times faster
+		update();
+		update();
+	}
+	
+	draw();
+	
+	countFPS()
+}, 15); // 67fps
+
+
+</script>
+</body>
+</html>
