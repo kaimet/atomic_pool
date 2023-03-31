@@ -285,11 +285,12 @@ Player.prototype.update = function() {
 		player.vx = player.vy = 0;
 		score = 50 - Math.floor(goalDistance()/goalCircles) * 10;
 		if (score < 0) score = 0;
-		if (!ballRebounce) score = 0;
 		
 		scoreElement.innerHTML = 'Score: ' + score;
-		if (!ballRebounce) 
+		if (!ballRebounce && score > 0) {
+			score = 0;
 			scoreElement.innerHTML = 'Score: 0' + '  (you need to rebounce off the ball)';
+		}
 	}
 	
 	
@@ -401,7 +402,7 @@ Ball.prototype.draw = function() {
 // ===================================================
 
 
-var all = balls.concat(player);
+var all = balls.concat({x: player.x, y: player.y, radius: 200}); // goal distance > 200px
 do {
 	var p = rndPosition(r);
 	var goal = {x: p.x, y: p.y, radius: player.radius}
