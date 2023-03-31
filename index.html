@@ -27,7 +27,7 @@ const nBalls = 2;
 
 // =============================================================
 
-var Score = 0;
+var score = 0;
 var gameStage = 1;
 var fast = false;
 var pause = false;
@@ -102,7 +102,7 @@ function db(v) {
 
 function Sound(filename) {
 		this.sounds = [];
-		var nSounds = 3;
+		var nSounds = 5;
 		this.currentSound = 0;
 		for (var i = 0; i < nSounds; i++) {
 				this.sounds.push(new Audio(filename));
@@ -130,7 +130,14 @@ setInterval(function(){
 }, 1000);
 
 
-// Function to check if two circles overlap
+
+function rndPosition(r) {
+	var x = r + Math.random() * (canvas.width - r*2);
+	var y = r + Math.random() * (canvas.height - r*2);
+	return {x: x, y: y};
+}
+
+
 function doCirclesNotOverlap(circle1, circle2) {
 	var dx = circle1.x - circle2.x;
 	var dy = circle1.y - circle2.y;
@@ -138,11 +145,56 @@ function doCirclesNotOverlap(circle1, circle2) {
 	return distance > circle1.radius + circle2.radius;
 }
 
-// Function to check if a circle overlaps with any existing circles
+
 function doesCircleNotOverlap(circle, circles) {
 	return circles.every((elem) => doCirclesNotOverlap(circle, elem));
 }
 
+
+function AdjustPlayerCollisionPosition(ball) {
+	// Calculate quadratic coefficients
+	let a = player.vx**2 + player.vy**2;
+	let b = 2 * (player.vx * (player.x - ball.x) + player.vy * (player.y - ball.y));
+	let c = (player.x - ball.x)**2 + (player.y - ball.y)**2 - (player.radius + ball.radius)**2;
+
+	// Calculate discriminant
+	let discriminant = b**2 - 4 * a * c;
+
+	
+	if (discriminant > 0) { // there is a collision
+		// Calculate time of collision
+		let t = (-b - Math.sqrt(discriminant)) / (2 * a);
+
+		// Calculate position of player at time of collision
+		player.x = player.x + player.vx * t;
+		player.y = player.y + player.vy * t;
+	}
+}
+
+
+function CheckBallCollision() {
+    for (let i = 0; i < balls.length; i++) {
+        let ball = balls[i];
+        let dx = player.x - ball.x;
+        let dy = player.y - ball.y;
+        let distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < player.radius + ball.radius) {
+            return ball;
+        }
+    }
+    return null;
+}
+
+
+function playerRebounce(collidingBall) {
+    let normal = {x: player.x - collidingBall.x, y: player.y - collidingBall.y};
+    let normalMagnitude = Math.sqrt(normal.x * normal.x + normal.y * normal.y);
+    normal.x /= normalMagnitude;
+    normal.y /= normalMagnitude;
+    let dotProduct = player.vx * normal.x + player.vy * normal.y;
+    player.vx = player.vx - 2 * dotProduct * normal.x;
+    player.vy = player.vy - 2 * dotProduct * normal.y;
+}
 
 
 // =================================================
@@ -159,7 +211,9 @@ function Player(x, y) {
 	this.sling = {x: x, y: y};
 	
 } 
-var player = new Player(playerRad + Math.random() * (canvas.width-playerRad*2), playerRad + Math.random() * (canvas.height-playerRad*2));
+var p = rndPosition(playerRad);
+var player = new Player(p.x, p.y);
+var ballRebounce = false;
 
 
 Player.prototype.speed = function() {
@@ -221,36 +275,57 @@ Player.prototype.update = function() {
 	if (collidingBall != null) {
 			AdjustPlayerCollisionPosition(collidingBall);
 			playerRebounce(collidingBall);
-			bounceSound.play();
+			ballRebounce = true;
+			playBounceBallSound();
 			if (gameStage == 2) gameStage = 3;
+	}
+	
+	if (gameStage == 3 && player.speed() < 0.01) {
+		gameStage = 4;
+		player.vx = player.vy = 0;
+		score = 50 - Math.floor(goalDistance()/goalCircles) * 10;
+		if (score < 0) score = 0;
+		if (!ballRebounce) score = 0;
+		
+		scoreElement.innerHTML = 'Score: ' + score;
+		if (!ballRebounce) 
+			scoreElement.innerHTML = 'Score: 0' + '  (you need to rebounce off the ball)';
 	}
 	
 	
 }// Player.update()
 
 
+function playBounceWallSound(v) {
+	if (Math.abs(v) > 0.5) bounceWallSound.play();
+}
+
+function playBounceBallSound() {
+	if (gameStage > 1) bounceSound.play();
+}
+
 Player.prototype.bounceWall = function() {
 	if (this.x - this.radius < edge) {
 			let overlap = edge + this.radius - this.x;
 			this.x += 2 * overlap;
 			this.vx *= -1;
-			bounceWallSound.play();
+			playBounceWallSound(this.vx);
 	} else if (this.x + this.radius > canvas.width-edge) { 
 			let overlap = this.x + this.radius - canvas.width+edge;
 			this.x -= 2 * overlap;
 			this.vx *= -1;
-			bounceWallSound.play();
+			playBounceWallSound(this.vx);
 	}
 	if (this.y - this.radius < edge) {
 			let overlap = edge + this.radius - this.y;
 			this.y += 2 * overlap;
 			this.vy *= -1;
-			bounceWallSound.play();
+			playBounceWallSound(this.vy);
 	} else if (this.y + this.radius > canvas.height-edge) { 
 			let overlap = this.y + this.radius - canvas.height+edge;
 			this.y -= 2 * overlap;
 			this.vy *= -1;
-			bounceWallSound.play();
+			playBounceWallSound(this.vy);
 	}
 }
 
@@ -285,7 +360,7 @@ Player.prototype.drawSling = function() {
 		var y = this.sling.y + i * dy/nlinks;
 		ctx.beginPath();
 		ctx.arc(x, y, r, 0, Math.PI * 2);
-		ctx.fillStyle = "#993300";
+		ctx.fillStyle = (i == 0) ? "black" : "#993300";
 		ctx.fill();
 	}
 }
@@ -306,75 +381,69 @@ for (var i = 0; i < nBalls; i++) {
 	var all = balls.concat(player);
 	var r = (i+5)*20; // 100, 120
 	do {
-		var x = r + Math.random() * (canvas.width - r*2);
-		var y = r + Math.random() * (canvas.height - r*2);
-		var ball = new Ball(x, y, r);
+		var p = rndPosition(r);
+		var ball = new Ball(p.x, p.y, r);
 	} while (!doesCircleNotOverlap(ball, all));
 	balls.push(ball);
 }
 
 
-function AdjustPlayerCollisionPosition(ball) {
-    // Calculate quadratic coefficients
-    let a = player.vx**2 + player.vy**2;
-    let b = 2 * (player.vx * (player.x - ball.x) + player.vy * (player.y - ball.y));
-    let c = (player.x - ball.x)**2 + (player.y - ball.y)**2 - (player.radius + ball.radius)**2;
-
-    // Calculate discriminant
-    let discriminant = b**2 - 4 * a * c;
-
-    // Check if there is a collision
-    if (discriminant < 0) {
-        // No collision
-        return [player.x, player.y];
-    } else {
-        // Calculate time of collision
-        let t = (-b - Math.sqrt(discriminant)) / (2 * a);
-
-        // Calculate position of player at time of collision
-        player.x = player.x + player.vx * t;
-        player.y = player.y + player.vy * t;
-    }
-}
-
-
-function CheckBallCollision() {
-    for (let i = 0; i < balls.length; i++) {
-        let ball = balls[i];
-        let dx = player.x - ball.x;
-        let dy = player.y - ball.y;
-        let distance = Math.sqrt(dx * dx + dy * dy);
-        if (distance < player.radius + ball.radius) {
-            return ball;
-        }
-    }
-    return null;
-}
-
-
-function playerRebounce(collidingBall) {
-    let normal = {x: player.x - collidingBall.x, y: player.y - collidingBall.y};
-    let normalMagnitude = Math.sqrt(normal.x * normal.x + normal.y * normal.y);
-    normal.x /= normalMagnitude;
-    normal.y /= normalMagnitude;
-    let dotProduct = player.vx * normal.x + player.vy * normal.y;
-    player.vx = player.vx - 2 * dotProduct * normal.x;
-    player.vy = player.vy - 2 * dotProduct * normal.y;
-}
-
-
-
 Ball.prototype.draw = function() {
 	ctx.beginPath();
 	ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-	ctx.fillStyle = "black";
+	ctx.fillStyle = "#222222";
 	ctx.fill();
+	ctx.strokeStyle = "black";
+	ctx.stroke();
 	
+}
+
+// ===================================================
+
+
+var all = balls.concat(player);
+do {
+	var p = rndPosition(r);
+	var goal = {x: p.x, y: p.y, radius: player.radius}
+} while (!doesCircleNotOverlap(goal, all));
+
+
+function goalDistance() {
+	var dx = player.x - goal.x;
+	var dy = player.y - goal.y;
+	return Math.sqrt(dx*dx + dy*dy);
+}
+
+
+const goalCircles = 50;
+function drawGoal() {
+	ctx.beginPath();
+	ctx.arc(goal.x, goal.y, player.radius/2, 0, Math.PI * 2);
+	ctx.fillStyle = "blue";
+	ctx.fill();
+	ctx.strokeStyle = "black";
+	ctx.stroke();
+	
+	if (gameStage > 2) {
+		var dx = player.x - goal.x;
+		var dy = player.y - goal.y;
+		var dist = Math.sqrt(dx*dx + dy*dy);
+		for (var i=1; i < 6; i++) {
+			if (i*goalCircles < dist) {
+				ctx.beginPath();
+				ctx.arc(goal.x, goal.y, i*goalCircles, 0, Math.PI * 2);
+				ctx.strokeStyle = "blue";
+				ctx.stroke();
+			}
+		}
+	}
 }
 
 
 
 
+
+// ====================================================
 
 
 function update() {
@@ -389,6 +458,8 @@ function update() {
 function draw() {
 	//drawBackground();
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
+	
+	drawGoal();
 	
 	player.draw();
 	
