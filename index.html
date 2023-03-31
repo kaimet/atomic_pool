@@ -17,14 +17,12 @@
 <script>  // ===================================================
 
 
-const playerRad = 10;
 const playerForce = 0.05;
 const traction = 0.95; // on stage 1
 const traction3 = 0.995; // on stage 3
 const slingForse = 0.001;
 
 const nBalls = 2;
-const ballRad = 80;
 
 
 // =============================================================
@@ -56,18 +54,10 @@ ctx.imageSmoothingEnabled = true;
 //ctx.imageSmoothingQuality = 'high';
 
 
-var backgroundImage = new Image();
-backgroundImage.src = "img/background.jpg";
-var edgeImage = new Image();
-edgeImage.src = "img/edge.jpg";
-
-var ballImage = new Image();
-ballImage.src = "img/ball.png";
-var speckMaskImage = new Image();
-speckMaskImage.src = "img/speck-mask.png";
-var playerImage = new Image();
-playerImage.src = "img/player.png";
-var trailImage = playerImage;
+//var backgroundImage = new Image();
+//backgroundImage.src = "img/background.jpg";
+//var edgeImage = new Image();
+//edgeImage.src = "img/edge.jpg";
 
 
 var bounceSound = new Sound('sounds/bounceball.mp3');
@@ -140,9 +130,25 @@ setInterval(function(){
 }, 1000);
 
 
+// Function to check if two circles overlap
+function doCirclesNotOverlap(circle1, circle2) {
+	var dx = circle1.x - circle2.x;
+	var dy = circle1.y - circle2.y;
+	var distance = Math.sqrt(dx * dx + dy * dy);
+	return distance > circle1.radius + circle2.radius;
+}
+
+// Function to check if a circle overlaps with any existing circles
+function doesCircleNotOverlap(circle, circles) {
+	return circles.every((elem) => doCirclesNotOverlap(circle, elem));
+}
 
 
 
+// =================================================
+
+
+const playerRad = 10;
 function Player(x, y) {
 	this.x = x;
 	this.y = y;
@@ -153,7 +159,7 @@ function Player(x, y) {
 	this.sling = {x: x, y: y};
 	
 } 
-var player = new Player(Math.random() * canvas.width, Math.random() * canvas.height);
+var player = new Player(playerRad + Math.random() * (canvas.width-playerRad*2), playerRad + Math.random() * (canvas.height-playerRad*2));
 
 
 Player.prototype.speed = function() {
@@ -192,16 +198,14 @@ Player.prototype.update = function() {
 	}
 	
 	
-	
-	
 	if (gameStage == 1) {
 	this.vx *= traction;
 	this.vy *= traction;
 	} else if (gameStage == 3) {
 		var v = this.speed()
 		if (v < traction3) { 
-			this.vx *= 0.9 + v * 0.1;
-			this.vy *= 0.9 + v * 0.1;
+			this.vx *= 0.95 + v * 0.05;
+			this.vy *= 0.95 + v * 0.05;
 		} else {
 			this.vx *= traction3;
 			this.vy *= traction3;
@@ -211,9 +215,7 @@ Player.prototype.update = function() {
 	this.x += this.vx;
 	this.y += this.vy;
 	
-	
 	this.bounceWall()
-	
 	
 	
 }// Player.update()
@@ -268,7 +270,7 @@ Player.prototype.drawSling = function() {
 	var dx = this.x - this.sling.x;
 	var dy = this.y - this.sling.y;
 	var length = Math.sqrt(dx * dx + dy * dy);
-	const nlinks = 25;
+	const nlinks = 15;
 	var r = this.radius/(Math.sqrt(this.slingLength())+5)*5;
 	for (i=0; i<nlinks; i++) {
 		var x = this.sling.x + i * dx/nlinks;
@@ -281,10 +283,67 @@ Player.prototype.drawSling = function() {
 }
 
 
+// ===============================================
+
+
+function Ball(x, y, r) {
+	this.x = x;
+	this.y = y;
+	this.radius = r;
+	
+}
+var balls = [];
+/*for (var i = 0; i < nBalls; i++) {
+		var r = (i+5)*20; // 100, 120
+	do {
+		var x = r + Math.random() * (canvas.width - r*2);
+		var y = r + Math.random() * (canvas.height - r*2);
+		var distance = Math.sqrt((x - player.x) * (x - player.x) + (y - player.y) * (y - player.y));
+	} while (distance < r + player.radius);
+	if (i>0){
+		for (var u = 0; u < i; u++) {
+			distance = Math.sqrt((x - balls[u].x) * (x - balls[u].x) + (y - balls[u].y) * (y - balls[u].y));
+			while (distance < r + player.radius) {
+		}
+	}
+	balls.push(new Ball(x, y, r));
+}*/
+
+for (var i = 0; i < nBalls; i++) {
+	//var all = []; all.concat(player, balls);
+	var all = balls.concat(player);
+	var r = (i+5)*20; // 100, 120
+	do {
+		var x = r + Math.random() * (canvas.width - r*2);
+		var y = r + Math.random() * (canvas.height - r*2);
+		var ball = new Ball(x, y, r);
+	} while (!doesCircleNotOverlap(ball, all));
+	balls.push(ball);
+}
+
+
+
+
+
+
+
+Ball.prototype.draw = function() {
+	ctx.beginPath();
+	ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+	ctx.fillStyle = "black";
+	ctx.fill();
+	
+}
+
+
+
+
+
 
 function update() {
 	
 	player.update();
+	
 	
 }
 
@@ -296,6 +355,9 @@ function draw() {
 	
 	player.draw();
 	
+	balls.forEach(function(ball) {
+			ball.draw();
+	});
 	
 }
 
