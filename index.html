@@ -217,6 +217,14 @@ Player.prototype.update = function() {
 	
 	this.bounceWall()
 	
+	let collidingBall = CheckBallCollision();
+	if (collidingBall != null) {
+			AdjustPlayerCollisionPosition(collidingBall);
+			playerRebounce(collidingBall);
+			bounceSound.play();
+			if (gameStage == 2) gameStage = 3;
+	}
+	
 	
 }// Player.update()
 
@@ -293,22 +301,6 @@ function Ball(x, y, r) {
 	
 }
 var balls = [];
-/*for (var i = 0; i < nBalls; i++) {
-		var r = (i+5)*20; // 100, 120
-	do {
-		var x = r + Math.random() * (canvas.width - r*2);
-		var y = r + Math.random() * (canvas.height - r*2);
-		var distance = Math.sqrt((x - player.x) * (x - player.x) + (y - player.y) * (y - player.y));
-	} while (distance < r + player.radius);
-	if (i>0){
-		for (var u = 0; u < i; u++) {
-			distance = Math.sqrt((x - balls[u].x) * (x - balls[u].x) + (y - balls[u].y) * (y - balls[u].y));
-			while (distance < r + player.radius) {
-		}
-	}
-	balls.push(new Ball(x, y, r));
-}*/
-
 for (var i = 0; i < nBalls; i++) {
 	//var all = []; all.concat(player, balls);
 	var all = balls.concat(player);
@@ -322,8 +314,53 @@ for (var i = 0; i < nBalls; i++) {
 }
 
 
+function AdjustPlayerCollisionPosition(ball) {
+    // Calculate quadratic coefficients
+    let a = player.vx**2 + player.vy**2;
+    let b = 2 * (player.vx * (player.x - ball.x) + player.vy * (player.y - ball.y));
+    let c = (player.x - ball.x)**2 + (player.y - ball.y)**2 - (player.radius + ball.radius)**2;
+
+    // Calculate discriminant
+    let discriminant = b**2 - 4 * a * c;
+
+    // Check if there is a collision
+    if (discriminant < 0) {
+        // No collision
+        return [player.x, player.y];
+    } else {
+        // Calculate time of collision
+        let t = (-b - Math.sqrt(discriminant)) / (2 * a);
+
+        // Calculate position of player at time of collision
+        player.x = player.x + player.vx * t;
+        player.y = player.y + player.vy * t;
+    }
+}
 
 
+function CheckBallCollision() {
+    for (let i = 0; i < balls.length; i++) {
+        let ball = balls[i];
+        let dx = player.x - ball.x;
+        let dy = player.y - ball.y;
+        let distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < player.radius + ball.radius) {
+            return ball;
+        }
+    }
+    return null;
+}
+
+
+function playerRebounce(collidingBall) {
+    let normal = {x: player.x - collidingBall.x, y: player.y - collidingBall.y};
+    let normalMagnitude = Math.sqrt(normal.x * normal.x + normal.y * normal.y);
+    normal.x /= normalMagnitude;
+    normal.y /= normalMagnitude;
+    let dotProduct = player.vx * normal.x + player.vy * normal.y;
+    player.vx = player.vx - 2 * dotProduct * normal.x;
+    player.vy = player.vy - 2 * dotProduct * normal.y;
+}
 
 
 
