@@ -69,6 +69,16 @@ ctx.imageSmoothingEnabled = true;
 //var edgeImage = new Image();
 //edgeImage.src = "img/edge.jpg";
 
+var playerImage = new Image();
+playerImage.src = "img/player.png";
+var linkImage = new Image();
+linkImage.src = "img/link.png";
+var ballImage = new Image();
+ballImage.src = "img/ball.png";
+var goalImage = new Image();
+goalImage.src = "img/goal.png";
+var prizeImage = new Image();
+prizeImage.src = "img/prize.png";
 
 var bounceSound = new Sound('sounds/bounceball.mp3');
 var bounceWallSound = bounceSound;
@@ -89,9 +99,9 @@ document.onkeydown = document.onkeyup = function(e) {
 	}
 	
 	// Pause on P or Escape
-	if (e.type == 'keydown' && (e.keyCode == 80 || e.keyCode == 27)) {
+	/*if (e.type == 'keydown' && (e.keyCode == 80 || e.keyCode == 27)) {
 		pause = pause ? false : true; 
-	}
+	}*/
 	
 	// Fast on Ctrl 
 	if (e.keyCode == 17) {
@@ -325,7 +335,7 @@ Player.prototype.update = function() {
 		scores.forEach(e => score10 += e);
 		score10Element.innerHTML = 'Score for the last 10 shots: ' + score10;
 		
-		setTimeout(startGame(), 3000);
+		setTimeout(startGame, 1500);
 	}
 	
 }// Player.update()
@@ -363,15 +373,14 @@ Player.prototype.draw = function() {
 		this.drawSling();
 	}
 	
-	//ctx.drawImage(playerImage, this.x - this.radius, this.y - 	this.radius, this.radius * 2, this.radius * 2);
-	
-	ctx.beginPath();
+	/*ctx.beginPath();
 	ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
 	ctx.fillStyle = "brown";
 	ctx.fill();
 	ctx.strokeStyle = "black";
-	ctx.stroke();
+	ctx.stroke();*/
 	
+	ctx.drawImage(playerImage, this.x - this.radius, this.y - 	this.radius, this.radius * 2, this.radius * 2);
 	
 } // Player.draw()
 
@@ -385,10 +394,12 @@ Player.prototype.drawSling = function() {
 	for (i=0; i<nlinks; i++) {
 		var x = this.sling.x + i * dx/nlinks;
 		var y = this.sling.y + i * dy/nlinks;
-		ctx.beginPath();
+		/*ctx.beginPath();
 		ctx.arc(x, y, r, 0, Math.PI * 2);
 		ctx.fillStyle = (i == 0) ? "black" : "#993300";
-		ctx.fill();
+		ctx.fill();*/
+		
+		ctx.drawImage(linkImage, x-r, y-r, r*2, r*2);
 	}
 }
 
@@ -405,12 +416,21 @@ function Ball(x, y, r) {
 
 
 Ball.prototype.draw = function() {
+	/*
 	ctx.beginPath();
 	ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
 	ctx.fillStyle = "#222222";
 	ctx.fill();
 	ctx.strokeStyle = "black";
 	ctx.stroke();
+	*/
+	
+	ctx.drawImage(
+		ballImage,
+		this.x - this.radius, this.y - this.radius,
+		this.radius * 2, this.radius * 2
+	);
+	
 	
 }
 
@@ -426,12 +446,27 @@ function goalDistance() {
 
 const goalCircles = 50;
 function drawGoal() {
-	ctx.beginPath();
+	/*ctx.beginPath();
 	ctx.arc(goal.x, goal.y, goal.radius, 0, Math.PI * 2);
 	ctx.fillStyle = "blue";
 	ctx.fill();
 	ctx.strokeStyle = "black";
-	ctx.stroke();
+	ctx.stroke();*/
+	
+	var d = 10;
+	ctx.globalAlpha = 0.6;
+	ctx.drawImage(
+		goalImage,
+		goal.x - goal.radius-d, goal.y - goal.radius-d,
+		(goal.radius+d) * 2, (goal.radius+d) * 2
+	);
+	
+	ctx.globalAlpha = 1;
+	ctx.drawImage(
+		goalImage,
+		goal.x - goal.radius, goal.y - goal.radius,
+		goal.radius * 2, goal.radius * 2
+	);
 	
 	if (gameStage > 2) {
 		var dx = player.x - goal.x;
@@ -466,13 +501,23 @@ function updatePrize() {
 function drawPrize() {
 	if (prize.used) return;
 	
+	ctx.globalAlpha = 0.6;
+	/*
 	ctx.beginPath();
-	ctx.globalAlpha = 0.5;
 	ctx.arc(prize.x, prize.y, prize.radius, 0, Math.PI * 2);
 	ctx.fillStyle = "green";
 	ctx.fill();
 	ctx.strokeStyle = "black";
 	ctx.stroke();
+	ctx.globalAlpha = 1;
+	*/
+	
+	ctx.drawImage(
+		prizeImage,
+		prize.x - prize.radius, prize.y - prize.radius,
+		prize.radius * 2, prize.radius * 2
+	);
+	
 	ctx.globalAlpha = 1;
 }
 
@@ -488,7 +533,6 @@ function startGame() {
 	ballRebounce = false;
 
 	// balls
-	
 	balls = [];
 	for (var i = 0; i < nBalls; i++) {
 		//var all = []; all.concat(player, balls);
@@ -504,10 +548,10 @@ function startGame() {
 	// goal
 	var all = balls.concat({x: player.x, y: player.y, radius: 200}); // goal distance > 200px
 	do {
-		var p = rndPosition(player.radius);
-		goal = {x: p.x, y: p.y, radius: player.radius}
+		var p = rndPosition(player.radius*3);
+		goal = {x: p.x, y: p.y, radius: player.radius*3}
 	} while (!doesCircleNotOverlap(goal, all));
-	goal.radius /= 2;
+	goal.radius *= 0.75;
 
 	// prize
 	var all = balls.concat(
