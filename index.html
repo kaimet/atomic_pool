@@ -17,7 +17,7 @@
 <script>  // ===================================================
 
 
-const playerForce = 0.05;
+const playerForce = 0.1;
 const traction = 0.95; // on stage 1
 const traction3 = 0.995; // on stage 3
 const slingForse = 0.001;
@@ -197,6 +197,16 @@ function playerRebounce(collidingBall) {
 }
 
 
+function updateScore() {
+	if (gameStage == 3) {
+		score = 50 - Math.floor(goalDistance()/goalCircles) * 10;
+		if (score < 0) score = 0;
+		if (prize.used) score *= 2;
+		scoreElement.innerHTML = 'Score: ' + score;
+	}
+}
+
+
 // =================================================
 
 
@@ -229,7 +239,9 @@ Player.prototype.slingLength = function() {
 
 Player.prototype.update = function() {
 	if (gameStage == 1) {
+		//db(this.speed());
 		var ds = playerForce * (this.speed() + 0.2);
+		if (ds > playerForce*3) ds -= (ds - playerForce*3)*2;
 		if (keys[37]) {            // left arrow
 				this.vx -= ds;
 		}
@@ -283,13 +295,10 @@ Player.prototype.update = function() {
 	if (gameStage == 3 && player.speed() < 0.01) {
 		gameStage = 4;
 		player.vx = player.vy = 0;
-		score = 50 - Math.floor(goalDistance()/goalCircles) * 10;
-		if (score < 0) score = 0;
 		
-		scoreElement.innerHTML = 'Score: ' + score;
 		if (!ballRebounce && score > 0) {
 			score = 0;
-			scoreElement.innerHTML = 'Score: 0' + '  (you need to rebounce off the ball)';
+			scoreElement.innerHTML = 'Score: 0' + '  (you have to rebounce off the ball)';
 		}
 	}
 	
@@ -404,9 +413,10 @@ Ball.prototype.draw = function() {
 
 var all = balls.concat({x: player.x, y: player.y, radius: 200}); // goal distance > 200px
 do {
-	var p = rndPosition(r);
+	var p = rndPosition(player.radius);
 	var goal = {x: p.x, y: p.y, radius: player.radius}
 } while (!doesCircleNotOverlap(goal, all));
+goal.radius /= 2;
 
 
 function goalDistance() {
@@ -419,7 +429,7 @@ function goalDistance() {
 const goalCircles = 50;
 function drawGoal() {
 	ctx.beginPath();
-	ctx.arc(goal.x, goal.y, player.radius/2, 0, Math.PI * 2);
+	ctx.arc(goal.x, goal.y, goal.radius, 0, Math.PI * 2);
 	ctx.fillStyle = "blue";
 	ctx.fill();
 	ctx.strokeStyle = "black";
@@ -430,27 +440,64 @@ function drawGoal() {
 		var dy = player.y - goal.y;
 		var dist = Math.sqrt(dx*dx + dy*dy);
 		for (var i=1; i < 6; i++) {
-			if (i*goalCircles < dist) {
-				ctx.beginPath();
-				ctx.arc(goal.x, goal.y, i*goalCircles, 0, Math.PI * 2);
-				ctx.strokeStyle = "blue";
-				ctx.stroke();
-			}
+			ctx.beginPath();
+			ctx.arc(goal.x, goal.y, i*goalCircles, 0, Math.PI * 2);
+			ctx.setLineDash(i*goalCircles < dist ? [] : [5, 10]);
+			ctx.strokeStyle = "blue";
+			ctx.stroke();
 		}
+		ctx.setLineDash([]);
+	}
+}
+
+// ===================================================
+
+
+var all = balls.concat(
+	{x: player.x, y: player.y, radius: 200},
+	{x: goal.x, y: goal.y, radius: 200}
+	);
+do {
+	var p = rndPosition(player.radius*4);
+	var prize = {x: p.x, y: p.y, radius: player.radius*4}
+} while (!doesCircleNotOverlap(prize, all));
+prize.radius *= 0.75;
+prize.used = false;
+
+
+function updatePrize() {
+	if (prize.used || gameStage != 3) return;
+	
+	let dx = player.x - prize.x;
+	let dy = player.y - prize.y;
+	let distance = Math.sqrt(dx * dx + dy * dy);
+	if (distance < player.radius + prize.radius) {
+		prize.used = true;
 	}
 }
 
 
-
+function drawPrize() {
+	if (prize.used) return;
+	
+	ctx.beginPath();
+	ctx.globalAlpha = 0.5;
+	ctx.arc(prize.x, prize.y, prize.radius, 0, Math.PI * 2);
+	ctx.fillStyle = "green";
+	ctx.fill();
+	ctx.strokeStyle = "black";
+	ctx.stroke();
+	ctx.globalAlpha = 1;
+}
 
 
 // ====================================================
 
 
 function update() {
-	
 	player.update();
-	
+	updatePrize();
+	updateScore();
 	
 }
 
@@ -461,6 +508,7 @@ function draw() {
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 	
 	drawGoal();
+	drawPrize();
 	
 	player.draw();
 	
