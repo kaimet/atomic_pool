@@ -10,9 +10,7 @@
 <canvas id="gameCanvas" width="550" height="550" style="border:2px solid #000000; background-image: url('img/background.jpg')"></canvas>
 </div>
 
-<div id="scoreContainer" style="display: flex; justify-content: center; font-size = '36px'"></div>
-
-
+<div id="scoreContainer" style="display: block; text-align: center;"></div>
 
 <script>  // ===================================================
 
@@ -27,8 +25,9 @@ const nBalls = 2;
 
 // =============================================================
 
-var score = 0;
-var gameStage = 1;
+var score;
+var scores = [];
+var gameStage;
 var fast = false;
 var pause = false;
 var gameOver = false;
@@ -36,9 +35,20 @@ var showFPS = false;
 var edge = 0;
 
 
+var player;
+var balls;
+var goal;
+var prize;
+var ballRebounce = false;
+
+
 var scoreElement = document.createElement('div');
 scoreContainer.appendChild(scoreElement);
-scoreElement.style.fontSize = '36px';
+scoreElement.style.fontSize = '32px';
+
+var score10Element = document.createElement('div');
+scoreContainer.appendChild(score10Element);
+score10Element.style.fontSize = '32px';
 
 var fpsOut = document.createElement('div');
 document.body.appendChild(fpsOut);
@@ -62,6 +72,7 @@ ctx.imageSmoothingEnabled = true;
 
 var bounceSound = new Sound('sounds/bounceball.mp3');
 var bounceWallSound = bounceSound;
+
 
 // =============================================
 
@@ -114,6 +125,15 @@ function Sound(filename) {
 		}
 }
 
+function playBounceWallSound(v) {
+	if (Math.abs(v) > 0.5) bounceWallSound.play();
+}
+
+function playBounceBallSound() {
+	if (gameStage > 1) bounceSound.play();
+}
+
+
 
 var frameTime = 0, lastLoop = new Date(), thisLoop;
 function countFPS() {
@@ -129,6 +149,18 @@ setInterval(function(){
 	}
 }, 1000);
 
+
+function updateScore() {
+	if (gameStage == 3) {
+		score = 50 - Math.floor(goalDistance()/goalCircles) * 10;
+		if (score < 0) score = 0;
+		if (prize.used) score *= 2;
+		scoreElement.innerHTML = 'Score: ' + score;
+	}
+}
+
+
+// ===============================================
 
 
 function rndPosition(r) {
@@ -197,16 +229,6 @@ function playerRebounce(collidingBall) {
 }
 
 
-function updateScore() {
-	if (gameStage == 3) {
-		score = 50 - Math.floor(goalDistance()/goalCircles) * 10;
-		if (score < 0) score = 0;
-		if (prize.used) score *= 2;
-		scoreElement.innerHTML = 'Score: ' + score;
-	}
-}
-
-
 // =================================================
 
 
@@ -221,10 +243,6 @@ function Player(x, y) {
 	this.sling = {x: x, y: y};
 	
 } 
-var p = rndPosition(playerRad);
-var player = new Player(p.x, p.y);
-var ballRebounce = false;
-
 
 Player.prototype.speed = function() {
   return Math.sqrt(this.vx * this.vx + this.vy * this.vy);
@@ -259,7 +277,7 @@ Player.prototype.update = function() {
 		this.vy -= (this.y - this.sling.y) * slingForse;
 		
 		if (this.slingLength() < this.radius) {
-			gameStage = 3
+			gameStage = 3;
 		}
 	}
 	
@@ -281,13 +299,13 @@ Player.prototype.update = function() {
 	this.x += this.vx;
 	this.y += this.vy;
 	
-	this.bounceWall()
+	this.bounceWall();
 	
 	let collidingBall = CheckBallCollision();
 	if (collidingBall != null) {
 			AdjustPlayerCollisionPosition(collidingBall);
 			playerRebounce(collidingBall);
-			ballRebounce = true;
+			if (gameStage == 3) ballRebounce = true;
 			playBounceBallSound();
 			if (gameStage == 2) gameStage = 3;
 	}
@@ -300,19 +318,18 @@ Player.prototype.update = function() {
 			score = 0;
 			scoreElement.innerHTML = 'Score: 0' + '  (you have to rebounce off the ball)';
 		}
+		
+		var ln = scores.push(score);
+		if (ln > 10) scores.shift();
+		var score10 = 0;
+		scores.forEach(e => score10 += e);
+		score10Element.innerHTML = 'Score for the last 10 shots: ' + score10;
+		
+		setTimeout(startGame(), 3000);
 	}
-	
 	
 }// Player.update()
 
-
-function playBounceWallSound(v) {
-	if (Math.abs(v) > 0.5) bounceWallSound.play();
-}
-
-function playBounceBallSound() {
-	if (gameStage > 1) bounceSound.play();
-}
 
 Player.prototype.bounceWall = function() {
 	if (this.x - this.radius < edge) {
@@ -385,17 +402,6 @@ function Ball(x, y, r) {
 	this.radius = r;
 	
 }
-var balls = [];
-for (var i = 0; i < nBalls; i++) {
-	//var all = []; all.concat(player, balls);
-	var all = balls.concat(player);
-	var r = (i+5)*20; // 100, 120
-	do {
-		var p = rndPosition(r);
-		var ball = new Ball(p.x, p.y, r);
-	} while (!doesCircleNotOverlap(ball, all));
-	balls.push(ball);
-}
 
 
 Ball.prototype.draw = function() {
@@ -409,14 +415,6 @@ Ball.prototype.draw = function() {
 }
 
 // ===================================================
-
-
-var all = balls.concat({x: player.x, y: player.y, radius: 200}); // goal distance > 200px
-do {
-	var p = rndPosition(player.radius);
-	var goal = {x: p.x, y: p.y, radius: player.radius}
-} while (!doesCircleNotOverlap(goal, all));
-goal.radius /= 2;
 
 
 function goalDistance() {
@@ -453,18 +451,6 @@ function drawGoal() {
 // ===================================================
 
 
-var all = balls.concat(
-	{x: player.x, y: player.y, radius: 200},
-	{x: goal.x, y: goal.y, radius: 200}
-	);
-do {
-	var p = rndPosition(player.radius*4);
-	var prize = {x: p.x, y: p.y, radius: player.radius*4}
-} while (!doesCircleNotOverlap(prize, all));
-prize.radius *= 0.75;
-prize.used = false;
-
-
 function updatePrize() {
 	if (prize.used || gameStage != 3) return;
 	
@@ -492,6 +478,50 @@ function drawPrize() {
 
 
 // ====================================================
+
+startGame();
+function startGame() {
+	gameStage = 1;
+
+	var p = rndPosition(playerRad);
+	player = new Player(p.x, p.y);
+	ballRebounce = false;
+
+	// balls
+	
+	balls = [];
+	for (var i = 0; i < nBalls; i++) {
+		//var all = []; all.concat(player, balls);
+		var all = balls.concat(player);
+		var r = (i+5)*20; // 100, 120
+		do {
+			var p = rndPosition(r);
+			var ball = new Ball(p.x, p.y, r);
+		} while (!doesCircleNotOverlap(ball, all));
+		balls.push(ball);
+	}
+
+	// goal
+	var all = balls.concat({x: player.x, y: player.y, radius: 200}); // goal distance > 200px
+	do {
+		var p = rndPosition(player.radius);
+		goal = {x: p.x, y: p.y, radius: player.radius}
+	} while (!doesCircleNotOverlap(goal, all));
+	goal.radius /= 2;
+
+	// prize
+	var all = balls.concat(
+		{x: player.x, y: player.y, radius: 200},
+		{x: goal.x, y: goal.y, radius: 200}
+		);
+	do {
+		var p = rndPosition(player.radius*4);
+		prize = {x: p.x, y: p.y, radius: player.radius*4}
+	} while (!doesCircleNotOverlap(prize, all));
+	prize.radius *= 0.75;
+	prize.used = false;
+
+}
 
 
 function update() {
