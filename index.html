@@ -33,12 +33,6 @@ var pause = false;
 var gameOver = false;
 var showFPS = false;
 var edge = 0;
-
-
-var player;
-var balls;
-var goal;
-var prize;
 var ballRebounce = false;
 
 
@@ -123,7 +117,7 @@ function db(v) {
 
 function Sound(filename) {
 		this.sounds = [];
-		var nSounds = 5;
+		var nSounds = 7;
 		this.currentSound = 0;
 		for (var i = 0; i < nSounds; i++) {
 				this.sounds.push(new Audio(filename));
@@ -321,7 +315,7 @@ Player.prototype.update = function() {
 	}
 	
 	if (gameStage == 3 && player.speed() < 0.01) {
-		gameStage = 4;
+		gameStage = 4; // pause before new game
 		player.vx = player.vy = 0;
 		
 		if (!ballRebounce && score > 0) {
@@ -335,7 +329,7 @@ Player.prototype.update = function() {
 		scores.forEach(e => score10 += e);
 		score10Element.innerHTML = 'Score for the last 10 shots: ' + score10;
 		
-		setTimeout(startGame, 1500);
+		setTimeout(startGame, 800);
 	}
 	
 }// Player.update()
@@ -468,7 +462,7 @@ function drawGoal() {
 		goal.radius * 2, goal.radius * 2
 	);
 	
-	if (gameStage > 2) {
+	if (gameStage == 3 || gameStage == 4) {
 		var dx = player.x - goal.x;
 		var dy = player.y - goal.y;
 		var dist = Math.sqrt(dx*dx + dy*dy);
@@ -499,76 +493,150 @@ function updatePrize() {
 
 
 function drawPrize() {
-	if (prize.used) return;
-	
-	ctx.globalAlpha = 0.6;
-	/*
-	ctx.beginPath();
-	ctx.arc(prize.x, prize.y, prize.radius, 0, Math.PI * 2);
-	ctx.fillStyle = "green";
-	ctx.fill();
-	ctx.strokeStyle = "black";
-	ctx.stroke();
-	ctx.globalAlpha = 1;
-	*/
-	
-	ctx.drawImage(
-		prizeImage,
-		prize.x - prize.radius, prize.y - prize.radius,
-		prize.radius * 2, prize.radius * 2
-	);
-	
-	ctx.globalAlpha = 1;
+    if (prize.used) {
+        ctx.font = '32px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = 'green';
+        ctx.fillText('×2', prize.x, prize.y);
+    } else {
+        ctx.globalAlpha = 0.6;
+        ctx.drawImage(
+            prizeImage,
+            prize.x - prize.radius,
+            prize.y - prize.radius,
+            prize.radius * 2,
+            prize.radius * 2
+        );
+        ctx.globalAlpha = 1;
+    }
 }
 
 
 // ====================================================
 
+// Create player
+let player = new Player(0, 0);
+
+// Create balls
+let balls = [];
+for (let i = 0; i < nBalls; i++) {
+    let r = (i + 5) * 20;
+    let ball = new Ball(0, 0, r);
+    balls.push(ball);
+}
+
+// Create goal
+let goal = { x: 0, y: 0, radius: player.radius * 3 * 0.75 };
+
+// Create prize
+let prize = { x: 0, y: 0, radius: player.radius * 4 * 0.75 };
+prize.used = false;
+
+
 startGame();
 function startGame() {
-	gameStage = 1;
+		gameStage = 5; // transition
+		
+    // Calculate new position for player
+    let newPlayerPos = { x: rndPosition(playerRad).x, y: rndPosition(playerRad).y, radius: player.radius };
 
-	var p = rndPosition(playerRad);
-	player = new Player(p.x, p.y);
-	ballRebounce = false;
+    // Calculate new positions for balls
+    let newBallPositions = [];
+    for (let i = 0; i < nBalls; i++) {
+        let all = newBallPositions.concat(newPlayerPos);
+        let r = (i + 5) * 20;
+        let p;
+        let ball;
+        do {
+            p = rndPosition(r);
+        } while (!doesCircleNotOverlap({ x: p.x, y: p.y, radius: r }, all));
+        newBallPositions.push({ x: p.x, y: p.y, radius: r });
+    }
 
-	// balls
-	balls = [];
-	for (var i = 0; i < nBalls; i++) {
-		//var all = []; all.concat(player, balls);
-		var all = balls.concat(player);
-		var r = (i+5)*20; // 100, 120
-		do {
-			var p = rndPosition(r);
-			var ball = new Ball(p.x, p.y, r);
-		} while (!doesCircleNotOverlap(ball, all));
-		balls.push(ball);
-	}
+    // Calculate new position for goal
+    let all = newBallPositions.concat(newPlayerPos);
+    let goalPos;
+    do {
+        goalPos = rndPosition(player.radius * 3);
+    } while (!doesCircleNotOverlap({ x: goalPos.x, y: goalPos.y, radius: player.radius * 3 }, all));
+    goalPos.radius = player.radius * 3 * 0.75;
 
-	// goal
-	var all = balls.concat({x: player.x, y: player.y, radius: 200}); // goal distance > 200px
-	do {
-		var p = rndPosition(player.radius*3);
-		goal = {x: p.x, y: p.y, radius: player.radius*3}
-	} while (!doesCircleNotOverlap(goal, all));
-	goal.radius *= 0.75;
+    // Calculate new position for prize
+    all = newBallPositions.concat(newPlayerPos).concat(goalPos);
+    let prizePos;
+    do {
+        prizePos = rndPosition(player.radius * 4);
+    } while (!doesCircleNotOverlap({ x: prizePos.x, y: prizePos.y, radius: player.radius * 4 }, all));
+    prizePos.radius = player.radius * 4 * 0.75;
+		
+		prize.used = false;
 
-	// prize
-	var all = balls.concat(
-		{x: player.x, y: player.y, radius: 200},
-		{x: goal.x, y: goal.y, radius: 200}
-		);
-	do {
-		var p = rndPosition(player.radius*4);
-		prize = {x: p.x, y: p.y, radius: player.radius*4}
-	} while (!doesCircleNotOverlap(prize, all));
-	prize.radius *= 0.75;
-	prize.used = false;
+    // Transition objects to their new positions
+    transitionObjects(
+        [player].concat(balls).concat([goal]).concat([prize]),
+        [newPlayerPos].concat(newBallPositions).concat([goalPos]).concat([prizePos]),
+        600,
+        () => {
+            player.sling.x = player.x;
+            player.sling.y = player.y;
+						gameStage = 1;
+						ballRebounce = false;
+        }
+    );
+
 
 }
 
+function lerp(start, end, progress) {
+    return start + (end - start) * progress;
+}
+
+function easeInOutQuad(progress) {
+    if (progress < 0.5) {
+        return 2 * progress * progress;
+    } else {
+        return -1 + (4 - 2 * progress) * progress;
+    }
+}
+
+function nlerp(start, end, progress) {
+    let easedProgress = easeInOutQuad(progress);
+    return start + (end - start) * easedProgress;
+}
+
+function transitionObjects(objects, newPositions, duration, onComplete) {
+    let startTime = Date.now();
+    let endTime = startTime + duration;
+
+    // Store starting positions of objects
+    let startPositions = objects.map(object => ({ x: object.x, y: object.y }));
+
+    let updatePositions = () => {
+        let now = Date.now();
+        let progress = (now - startTime) / duration;
+        if (progress > 1) progress = 1;
+
+        for (let i = 0; i < objects.length; i++) {
+            // Use stored starting positions
+            objects[i].x = nlerp(startPositions[i].x, newPositions[i].x, progress);
+            objects[i].y = nlerp(startPositions[i].y, newPositions[i].y, progress);
+        }
+
+        if (now < endTime) {
+            requestAnimationFrame(updatePositions);
+        } else if (onComplete) {
+            onComplete();
+        }
+    };
+
+    updatePositions();
+}
+
+
 
 function update() {
+	if (gameStage > 3) return;
 	player.update();
 	updatePrize();
 	updateScore();
