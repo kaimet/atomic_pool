@@ -7,7 +7,7 @@
 <body style="background-image: url('img/bg.jpg')">
 
 <div id="container" style="display: flex; justify-content: center;">
-<canvas id="gameCanvas" width="550" height="550" style="border:2px solid #000000; background-image: url('img/background.jpg')"></canvas>
+<canvas id="gameCanvas" width="550" height="550" style="border:3px solid #444444; background-image: url('img/background.jpg')"></canvas>
 </div>
 
 <div id="scoreContainer" style="display: block; text-align: center;"></div>
@@ -28,12 +28,12 @@ const nBalls = 2;
 var score;
 var scores = [];
 var gameStage;
+var ballRebounce = false;
 var fast = false;
 var pause = false;
 var gameOver = false;
 var showFPS = false;
 var edge = 0;
-var ballRebounce = false;
 
 
 var scoreElement = document.createElement('div');
@@ -57,11 +57,6 @@ var ctx = canvas.getContext("2d");
 ctx.imageSmoothingEnabled = true;
 //ctx.imageSmoothingQuality = 'high';
 
-
-//var backgroundImage = new Image();
-//backgroundImage.src = "img/background.jpg";
-//var edgeImage = new Image();
-//edgeImage.src = "img/edge.jpg";
 
 var playerImage = new Image();
 playerImage.src = "img/player.png";
@@ -367,33 +362,20 @@ Player.prototype.draw = function() {
 		this.drawSling();
 	}
 	
-	/*ctx.beginPath();
-	ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-	ctx.fillStyle = "brown";
-	ctx.fill();
-	ctx.strokeStyle = "black";
-	ctx.stroke();*/
-	
 	ctx.drawImage(playerImage, this.x - this.radius, this.y - 	this.radius, this.radius * 2, this.radius * 2);
 	
-} // Player.draw()
+} 
 
 
 Player.prototype.drawSling = function() {
 	var dx = this.x - this.sling.x;
 	var dy = this.y - this.sling.y;
 	var length = Math.sqrt(dx * dx + dy * dy);
-	//const nlinks = length < 90 ? 7 : 21;
 	const nlinks = 21;
-	//var r = this.radius/(Math.sqrt(this.slingLength())+5)*5;
 	var r = 3;
 	for (i=0; i<nlinks; i++) {
 		var x = this.sling.x + i * dx/nlinks;
 		var y = this.sling.y + i * dy/nlinks;
-		/*ctx.beginPath();
-		ctx.arc(x, y, r, 0, Math.PI * 2);
-		ctx.fillStyle = (i == 0) ? "black" : "#993300";
-		ctx.fill();*/
 		
 		ctx.drawImage(linkImage, x-r, y-r, r*2, r*2);
 	}
@@ -407,27 +389,15 @@ function Ball(x, y, r) {
 	this.x = x;
 	this.y = y;
 	this.radius = r;
-	
 }
 
 
 Ball.prototype.draw = function() {
-	/*
-	ctx.beginPath();
-	ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-	ctx.fillStyle = "#222222";
-	ctx.fill();
-	ctx.strokeStyle = "black";
-	ctx.stroke();
-	*/
-	
 	ctx.drawImage(
 		ballImage,
 		this.x - this.radius, this.y - this.radius,
 		this.radius * 2, this.radius * 2
 	);
-	
-	
 }
 
 // ===================================================
@@ -442,12 +412,6 @@ function goalDistance() {
 
 const goalCircles = 50;
 function drawGoal() {
-	/*ctx.beginPath();
-	ctx.arc(goal.x, goal.y, goal.radius, 0, Math.PI * 2);
-	ctx.fillStyle = "blue";
-	ctx.fill();
-	ctx.strokeStyle = "black";
-	ctx.stroke();*/
 	
 	var d = 10;
 	ctx.globalAlpha = 0.6;
@@ -614,7 +578,6 @@ function transitionObjects(objects, newPositions, duration, onComplete) {
     let startTime = Date.now();
     let endTime = startTime + duration;
 
-    // Store starting positions of objects
     let startPositions = objects.map(object => ({ x: object.x, y: object.y }));
 
     let updatePositions = () => {
@@ -623,7 +586,6 @@ function transitionObjects(objects, newPositions, duration, onComplete) {
         if (progress > 1) progress = 1;
 
         for (let i = 0; i < objects.length; i++) {
-            // Use stored starting positions
             objects[i].x = nlerp(startPositions[i].x, newPositions[i].x, progress);
             objects[i].y = nlerp(startPositions[i].y, newPositions[i].y, progress);
         }
@@ -642,6 +604,7 @@ function transitionObjects(objects, newPositions, duration, onComplete) {
 
 function update() {
 	if (gameStage > 3) return;
+	
 	player.update();
 	updatePrize();
 	updateScore();
@@ -651,7 +614,6 @@ function update() {
 
 
 function draw() {
-	//drawBackground();
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 	
 	drawGoal();
